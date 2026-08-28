@@ -1,6 +1,16 @@
-# 3D LiDAR Scanner - Hardware Setup & System Architecture
+# 🌐 3D LiDAR Scanner — Hardware Setup & System Architecture
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![GUI](https://img.shields.io/badge/GUI-PyQt6%20%7C%20PyQtGraph-green.svg)](https://riverbankcomputing.com/software/pyqt/)
+[![Rendering](https://img.shields.io/badge/3D%20Engine-OpenGL%20Hardware%20Accel-orange.svg?logo=opengl&logoColor=white)](https://www.opengl.org/)
+[![Hardware](https://img.shields.io/badge/Hardware-Dual%20ESP32%20%7C%20TF--Luna%20%7C%20SG90-red.svg)](https://en.wikipedia.org/wiki/ESP32)
+[![Protocol](https://img.shields.io/badge/BLE-Multi--Link%20Telemetry-blueviolet.svg)](https://www.bluetooth.com/)
+[![Export](https://img.shields.io/badge/Export-PLY%20%7C%20XYZ%20%7C%20CSV%20%7C%20JSON-lightgrey.svg)](https://en.wikipedia.org/wiki/PLY_(file_format))
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A modular, cable-free 3D point cloud LiDAR scanning system combining a **TF-Luna** Time-of-Flight (ToF) sensor, an **SG90** servo gimbal for vertical pitch elevation, and an independent **28BYJ-48** stepper-driven rotary stage for full horizontal azimuth scanning.
+
+> **Universal Hardware Support:** Seamlessly shares the same physical hardware and ESP32 firmware with **LiDAR Studio 2D**. Operates in multi-layer volumetric 3D mode by synchronizing automatic gimbal pitch stepping with 360° azimuth rotations.
 
 ---
 <img width="1887" height="955" alt="Screenshot 2026-08-28 165730" src="https://github.com/user-attachments/assets/1dbd738b-b4a4-406a-9b78-87b1882f1b8c" />
