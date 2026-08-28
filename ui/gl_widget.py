@@ -1,5 +1,8 @@
+import math
 import pyqtgraph.opengl as gl
 import numpy as np
+from PyQt6.QtGui import QVector3D
+from PyQt6.QtCore import Qt, QPoint
 
 class PointCloudView(gl.GLViewWidget):
     def __init__(self, parent=None):
@@ -16,6 +19,7 @@ class PointCloudView(gl.GLViewWidget):
         self.colormap_mode = "Elevation (Gradient)"
         self.current_points = []
         self.current_colors = np.empty((0, 4))
+        self.last_mouse_pos = QPoint()
 
         # Scatter Plot OpenGL
         self.scatter = gl.GLScatterPlotItem(
@@ -25,6 +29,43 @@ class PointCloudView(gl.GLViewWidget):
             pxMode=True
         )
         self.addItem(self.scatter)
+
+    # --- TRASLAZIONE VISTA (PAN) CON TASTO DESTRO ---
+    def mousePressEvent(self, ev):
+        self.last_mouse_pos = ev.pos()
+        super().mousePressEvent(ev)
+
+    def mouseMoveEvent(self, ev):
+        diff = ev.pos() - self.last_mouse_pos
+        self.last_mouse_pos = ev.pos()
+
+        if ev.buttons() == Qt.MouseButton.RightButton:
+            dx = diff.x()
+            dy = diff.y()
+
+            az_rad = math.radians(self.opts['azimuth'])
+            dist = self.opts['distance']
+            scale = dist * 0.002
+
+            move_x = -dx * math.sin(az_rad) * scale
+            move_y = dx * math.cos(az_rad) * scale
+            move_z = dy * scale
+
+            current_pos = self.opts['center']
+            new_pos = QVector3D(
+                current_pos.x() + move_x,
+                current_pos.y() + move_y,
+                current_pos.z() + move_z
+            )
+            self.setCameraPosition(pos=new_pos)
+        else:
+            super().mouseMoveEvent(ev)
+
+    def set_camera_center_z(self, z_height: float):
+        """Imposta la quota Z del centro di rotazione della telecamera."""
+        current_pos = self.opts['center']
+        new_pos = QVector3D(current_pos.x(), current_pos.y(), float(z_height))
+        self.setCameraPosition(pos=new_pos)
 
     def set_point_size(self, size: float):
         """Imposta la dimensione dei punti rendering."""
@@ -67,7 +108,6 @@ class PointCloudView(gl.GLViewWidget):
             colors[:, 2] = 0.95
             colors[:, 3] = 0.9
         elif self.colormap_mode == "Heatmap (Turbo)":
-            # Approssimazione heatmap (Blu -> Ciano -> Giallo -> Rosso)
             colors[:, 0] = np.clip(1.5 - np.abs(z_norm * 4 - 3), 0, 1)
             colors[:, 1] = np.clip(1.5 - np.abs(z_norm * 4 - 2), 0, 1)
             colors[:, 2] = np.clip(1.5 - np.abs(z_norm * 4 - 1), 0, 1)
@@ -78,23 +118,18 @@ class PointCloudView(gl.GLViewWidget):
 
     # --- PRESET TELECAMERA RAPIDI ---
     def set_view_top(self):
-        """Vista Pianta 2D dall'alto (Bird's eye)"""
-        self.setCameraPosition(distance=450, elevation=90, azimuth=0)
+        self.setCameraPosition(pos=self.opts['center'], distance=self.opts['distance'], elevation=90, azimuth=0)
 
     def set_view_front(self):
-        """Vista Frontale X-Z"""
-        self.setCameraPosition(distance=450, elevation=0, azimuth=0)
+        self.setCameraPosition(pos=self.opts['center'], distance=self.opts['distance'], elevation=0, azimuth=0)
 
     def set_view_side(self):
-        """Vista Laterale Y-Z"""
-        self.setCameraPosition(distance=450, elevation=0, azimuth=90)
+        self.setCameraPosition(pos=self.opts['center'], distance=self.opts['distance'], elevation=0, azimuth=90)
 
     def set_view_iso(self):
-        """Vista Prospettica Isometrica 3D"""
-        self.setCameraPosition(distance=400, elevation=30, azimuth=45)
+        self.setCameraPosition(pos=self.opts['center'], distance=self.opts['distance'], elevation=30, azimuth=45)
 
     def capture_image(self, filepath: str):
-        """Cattura uno screenshot HD della scena 3D."""
         image = self.grabFramebuffer()
         image.save(filepath, "PNG")
 

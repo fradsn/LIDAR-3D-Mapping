@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
     def _create_menu_bar(self):
         menubar = self.menuBar()
 
-        # --- MENU FILE (ESPORTAZIONE E SALVATAGGI) ---
+        # --- MENU FILE ---
         file_menu = menubar.addMenu("&File")
 
         act_export_ply = QAction("Esporta come Mesh/Point Cloud (.ply)...", self)
@@ -135,9 +135,9 @@ class MainWindow(QMainWindow):
         
         cfg_box.addWidget(QLabel("Risoluzione / Densità:"))
         self.combo_res = QComboBox()
-        self.combo_res.addItem("⚡ Fast Test (Passo 15° ~4 min)", 15)
-        self.combo_res.addItem("⚡ Standard (Passo 5° ~15 min)", 5)
-        self.combo_res.addItem("🔬 Ultra High-Density (Passo 2° ~35 min)", 2)
+        self.combo_res.addItem("⚡ Fast Test (Passo 15° ~7 min)", 15)
+        self.combo_res.addItem("⚡ Standard (Passo 5° ~18 min)", 5)
+        self.combo_res.addItem("🔬 Ultra High-Density (Passo 2° ~40 min)", 2)
         self.combo_res.setCurrentIndex(1)
         self.combo_res.currentIndexChanged.connect(self._on_resolution_changed)
         cfg_box.addWidget(self.combo_res)
@@ -145,9 +145,10 @@ class MainWindow(QMainWindow):
         cfg_box.addWidget(QLabel("Altezza Sensore da Terra (cm):"))
         self.spin_height = QDoubleSpinBox()
         self.spin_height.setRange(0.0, 300.0)
-        self.spin_height.setValue(0.0)
-        self.spin_height.setSingleStep(1.0)
+        self.spin_height.setValue(80.0)
+        self.spin_height.setSingleStep(5.0)
         self.spin_height.setSuffix(" cm")
+        self.spin_height.valueChanged.connect(self.viewer.set_camera_center_z)
         cfg_box.addWidget(self.spin_height)
 
         panel_layout.addWidget(config_group)
@@ -209,7 +210,7 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("Pronto")
+        self.progress_bar.setFormat("%p%")  # Mostra solo la percentuale
 
         self.lbl_time_info = QLabel("Tempo rimanente: --:--")
         
@@ -254,11 +255,17 @@ class MainWindow(QMainWindow):
         if self.btn_scan.text() == "Avvia Scansione 3D":
             self.sync_engine.clear()
             self.viewer.clear()
-            self.sync_engine.sensor_height_cm = self.spin_height.value()
+            
+            # 1. Imposta la quota nel motore matematico (pavimento = Z 0)
+            h = self.spin_height.value()
+            self.sync_engine.sensor_height_cm = h
+            
+            # 2. Imposta il mirino della telecamera esattamente all'altezza del sensore
+            self.viewer.set_camera_center_z(h)
+            
             self.current_step_idx = 0
             self.current_plate_azimuth = 0.0
             self.progress_bar.setValue(0)
-            self.progress_bar.setFormat("0% - Inizializzazione...")
             
             self.combo_res.setEnabled(False)
             self.spin_height.setEnabled(False)
@@ -275,7 +282,6 @@ class MainWindow(QMainWindow):
             self.combo_res.setEnabled(True)
             self.spin_height.setEnabled(True)
             self.lbl_time_info.setText("Scansione interrotta.")
-            self.progress_bar.setFormat("Scansione interrotta")
 
     def _on_base_status(self, connected: bool, rssi: int):
         self.base_is_connected = connected
@@ -341,7 +347,6 @@ class MainWindow(QMainWindow):
                 self.ble_manager.send_command("STEP_TILT", step=self.tilt_step_deg)
             else:
                 self.progress_bar.setValue(100)
-                self.progress_bar.setFormat("100% - Completato")
                 self.lbl_time_info.setText("Scansione 3D completata con successo!")
                 self.log_console.append(">>> Scansione 3D completata al 100%! <<<")
                 self.eta_timer.stop()
@@ -362,10 +367,8 @@ class MainWindow(QMainWindow):
 
         mins = remaining_sec // 60
         secs = remaining_sec % 60
-        time_str = f"{mins:02d}:{secs:02d}"
 
-        self.progress_bar.setFormat(f"{perc}% - Rimangono: {time_str}")
-        self.lbl_time_info.setText(f"Tempo rimanente: {mins} min {secs} sec")
+        self.lbl_time_info.setText(f"Tempo rimanente: {mins:02d}:{secs:02d}")
 
     # --- METODI ESPORTAZIONE FILE ---
     def _export_ply(self):
