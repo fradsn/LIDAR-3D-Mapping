@@ -3,8 +3,7 @@ from bleak import BleakClient, BleakScanner
 from PyQt6.QtCore import QThread, pyqtSignal
 from config import (
     BASE_NODE_NAME, BASE_AZIMUTH_CHAR_UUID, BASE_CTRL_CHAR_UUID,
-    PAYLOAD_NODE_NAME, PAYLOAD_SCAN_CHAR_UUID, PAYLOAD_CTRL_CHAR_UUID,
-    GEAR_RATIO
+    PAYLOAD_NODE_NAME, PAYLOAD_SCAN_CHAR_UUID, PAYLOAD_CTRL_CHAR_UUID
 )
 
 class BLEManager(QThread):
@@ -22,10 +21,6 @@ class BLEManager(QThread):
         self.client_payload = None
         self.is_running = True
         self.command_queue = asyncio.Queue()
-        
-        # Tracciamento rotazione continua del piatto
-        self.motor_rev_count = 0
-        self.last_motor_deg = 0.0
         self.prev_plate_deg = 0.0
 
     def run(self):
@@ -43,26 +38,35 @@ class BLEManager(QThread):
                     await self._disconnect_nodes()
                 elif cmd == "START_SCAN":
                     rpm = args.get("rpm", 10)
-                    self.motor_rev_count = 0
-                    self.last_motor_deg = 0.0
                     self.prev_plate_deg = 0.0
                     
                     # 1. Avvia prima il Payload LiDAR
                     await self._send_payload_cmd(bytes([0x01]))
                     await asyncio.sleep(0.15)
                     
-                    # 2. Avvia la Base Stepper
-                    await self._send_base_cmd(bytes([0x01, int(rpm)]))
+                    # 2. Avvia la Base Stepper su 360° completi [0x01, rpm, 0, 0, 3600_H, 3600_L]
+                    min_enc = 0
+                    max_enc = 3600
+                    base_payload = bytearray([
+                        0x01, int(rpm),
+                        (min_enc >> 8) & 0xFF, min_enc & 0xFF,
+                        (max_enc >> 8) & 0xFF, max_enc & 0xFF
+                    ])
+                    await self._send_base_cmd(base_payload)
                 elif cmd == "STOP_SCAN":
-                    # 1. Ferma prima la Base Stepper
                     await self._send_base_cmd(bytes([0x00]))
                     await asyncio.sleep(0.1)
-                    
-                    # 2. Ferma il Payload LiDAR
                     await self._send_payload_cmd(bytes([0x00]))
                 elif cmd == "SET_SPEED":
                     rpm = args.get("rpm", 10)
-                    await self._send_base_cmd(bytes([0x01, int(rpm)]))
+                    min_enc = 0
+                    max_enc = 3600
+                    base_payload = bytearray([
+                        0x01, int(rpm),
+                        (min_enc >> 8) & 0xFF, min_enc & 0xFF,
+                        (max_enc >> 8) & 0xFF, max_enc & 0xFF
+                    ])
+                    await self._send_base_cmd(base_payload)
                 elif cmd == "STEP_TILT":
                     step = args.get("step", 5)
                     await self._send_payload_cmd(bytes([0x03, step]))
@@ -158,17 +162,11 @@ class BLEManager(QThread):
     def _on_base_notify(self, sender, data: bytearray):
         if len(data) >= 6:
             theta_enc = (data[0] << 8) | data[1]
-            motor_deg = theta_enc / 10.0
-
-            if self.last_motor_deg > 300.0 and motor_deg < 60.0:
-                self.motor_rev_count += 1
-            self.last_motor_deg = motor_deg
-
-            total_motor_angle = (self.motor_rev_count * 360.0) + motor_deg
-            plate_deg = (total_motor_angle / GEAR_RATIO) % 360.0
+            plate_deg = theta_enc / 10.0
 
             self.azimuth_received_sig.emit(plate_deg)
 
+            # Trigger fine giro del piatto a 360°
             if self.prev_plate_deg > 320.0 and plate_deg < 40.0:
                 self.lap_completed_sig.emit(1)
             self.prev_plate_deg = plate_deg
@@ -182,7 +180,6 @@ class BLEManager(QThread):
     async def _send_base_cmd(self, payload: bytes):
         if self.client_base and self.client_base.is_connected:
             try:
-                # response=False evita blocchi o attese ACK
                 await self.client_base.write_gatt_char(BASE_CTRL_CHAR_UUID, payload, response=False)
             except Exception as e:
                 self.log_sig.emit(f"Errore invio comando Base: {e}")
@@ -190,7 +187,6 @@ class BLEManager(QThread):
     async def _send_payload_cmd(self, payload: bytes):
         if self.client_payload and self.client_payload.is_connected:
             try:
-                # response=False evita blocchi o attese ACK
                 await self.client_payload.write_gatt_char(PAYLOAD_CTRL_CHAR_UUID, payload, response=False)
             except Exception as e:
                 self.log_sig.emit(f"Errore invio comando Payload: {e}")
