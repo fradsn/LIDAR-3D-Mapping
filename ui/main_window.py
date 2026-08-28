@@ -12,7 +12,7 @@ from ui.gl_widget import PointCloudView
 from core.ble_manager import BLEManager
 from core.sync_engine import SyncEngine
 from core.exporter import export_to_ply, export_to_xyz, save_to_json, load_from_json
-from config import SERVO_BOTTOM_DEG, SERVO_TOP_DEG
+from config import SERVO_BOTTOM_DEG, SERVO_TOP_DEG, DEFAULT_STEPPER_RPM, GEAR_RATIO
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -30,8 +30,9 @@ class MainWindow(QMainWindow):
         self.payload_is_connected = False
         self.current_plate_azimuth = 0.0
         
+        self.current_speed_rpm = DEFAULT_STEPPER_RPM
         self.scan_start_time = 0.0
-        self.est_lap_duration = 54.0
+        self._recalculate_lap_estimate()
 
         self.eta_timer = QTimer(self)
         self.eta_timer.setInterval(200)
@@ -42,6 +43,10 @@ class MainWindow(QMainWindow):
         self._bind_signals()
         
         self.ble_manager.start()
+
+    def _recalculate_lap_estimate(self):
+        # Durata teorica 1 giro piatto in secondi: (60 / RPM) * GEAR_RATIO
+        self.est_lap_duration = (60.0 / self.current_speed_rpm) * GEAR_RATIO
 
     def _recalculate_tilt_sequence(self):
         self.target_servo_angles = list(range(SERVO_BOTTOM_DEG, SERVO_TOP_DEG - 1, -self.tilt_step_deg))
@@ -135,12 +140,21 @@ class MainWindow(QMainWindow):
         
         cfg_box.addWidget(QLabel("Risoluzione / Densità:"))
         self.combo_res = QComboBox()
-        self.combo_res.addItem("⚡ Fast Test (Passo 15° ~7 min)", 15)
-        self.combo_res.addItem("⚡ Standard (Passo 5° ~18 min)", 5)
-        self.combo_res.addItem("🔬 Ultra High-Density (Passo 2° ~40 min)", 2)
+        self.combo_res.addItem("⚡ Fast Test (Passo 15°)", 15)
+        self.combo_res.addItem("⚡ Standard (Passo 5°)", 5)
+        self.combo_res.addItem("🔬 Ultra High-Density (Passo 2°)", 2)
         self.combo_res.setCurrentIndex(1)
         self.combo_res.currentIndexChanged.connect(self._on_resolution_changed)
         cfg_box.addWidget(self.combo_res)
+
+        # Slider Regolazione Velocità Rotazione
+        self.lbl_speed = QLabel(f"Velocità Stepper: {self.current_speed_rpm} RPM")
+        self.slider_speed = QSlider(Qt.Orientation.Horizontal)
+        self.slider_speed.setRange(4, 16)
+        self.slider_speed.setValue(self.current_speed_rpm)
+        self.slider_speed.valueChanged.connect(self._on_speed_changed)
+        cfg_box.addWidget(self.lbl_speed)
+        cfg_box.addWidget(self.slider_speed)
 
         cfg_box.addWidget(QLabel("Altezza Sensore da Terra (cm):"))
         self.spin_height = QDoubleSpinBox()
@@ -210,7 +224,7 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFormat("%p%")  # Mostra solo la percentuale
+        self.progress_bar.setFormat("%p%")
 
         self.lbl_time_info = QLabel("Tempo rimanente: --:--")
         
@@ -236,6 +250,13 @@ class MainWindow(QMainWindow):
         self.ble_manager.lap_completed_sig.connect(self._on_lap_completed)
         self.ble_manager.log_sig.connect(self.log_console.append)
 
+    def _on_speed_changed(self, val):
+        self.current_speed_rpm = val
+        self.lbl_speed.setText(f"Velocità Stepper: {val} RPM")
+        self._recalculate_lap_estimate()
+        if self.btn_scan.text() == "Ferma Scansione":
+            self.ble_manager.send_command("SET_SPEED", rpm=val)
+
     def _on_resolution_changed(self, idx):
         self.tilt_step_deg = self.combo_res.currentData()
         self._recalculate_tilt_sequence()
@@ -256,11 +277,8 @@ class MainWindow(QMainWindow):
             self.sync_engine.clear()
             self.viewer.clear()
             
-            # 1. Imposta la quota nel motore matematico (pavimento = Z 0)
             h = self.spin_height.value()
             self.sync_engine.sensor_height_cm = h
-            
-            # 2. Imposta il mirino della telecamera esattamente all'altezza del sensore
             self.viewer.set_camera_center_z(h)
             
             self.current_step_idx = 0
@@ -270,10 +288,11 @@ class MainWindow(QMainWindow):
             self.combo_res.setEnabled(False)
             self.spin_height.setEnabled(False)
             self.scan_start_time = time.time()
+            self._recalculate_lap_estimate()
             self.lbl_time_info.setText("Tempo rimanente: Calcolo...")
             self.eta_timer.start()
 
-            self.ble_manager.send_command("START_SCAN")
+            self.ble_manager.send_command("START_SCAN", rpm=self.current_speed_rpm)
             self.btn_scan.setText("Ferma Scansione")
         else:
             self.eta_timer.stop()
@@ -370,7 +389,6 @@ class MainWindow(QMainWindow):
 
         self.lbl_time_info.setText(f"Tempo rimanente: {mins:02d}:{secs:02d}")
 
-    # --- METODI ESPORTAZIONE FILE ---
     def _export_ply(self):
         if not self.sync_engine.points_3d:
             QMessageBox.warning(self, "Attenzione", "Nessun punto 3D presente da esportare.")
@@ -403,6 +421,7 @@ class MainWindow(QMainWindow):
                 path += ".json"
             meta = {
                 "tilt_step": self.tilt_step_deg,
+                "stepper_rpm": self.current_speed_rpm,
                 "sensor_height_cm": self.spin_height.value(),
                 "total_points": len(self.sync_engine.points_3d),
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")

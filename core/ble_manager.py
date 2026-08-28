@@ -42,17 +42,24 @@ class BLEManager(QThread):
                 elif cmd == "DISCONNECT":
                     await self._disconnect_nodes()
                 elif cmd == "START_SCAN":
-                    # Resetta i contatori di giro all'avvio
+                    rpm = args.get("rpm", 10)
                     self.motor_rev_count = 0
                     self.last_motor_deg = 0.0
                     self.prev_plate_deg = 0.0
-                    # Avvia sia lo stepper alla base che il LiDAR tilt superiore
-                    await self._send_base_cmd(bytes([0x01]))
+                    
+                    # 1. Avvia il payload LiDAR
                     await self._send_payload_cmd(bytes([0x01]))
+                    await asyncio.sleep(0.1)
+                    
+                    # 2. Avvia la base stepper alla velocità specificata
+                    await self._send_base_cmd(bytes([0x01, int(rpm)]))
                 elif cmd == "STOP_SCAN":
-                    # Ferma entrambi i nodi e disattiva le bobine
                     await self._send_base_cmd(bytes([0x00]))
+                    await asyncio.sleep(0.05)
                     await self._send_payload_cmd(bytes([0x00]))
+                elif cmd == "SET_SPEED":
+                    rpm = args.get("rpm", 10)
+                    await self._send_base_cmd(bytes([0x01, int(rpm)]))
                 elif cmd == "STEP_TILT":
                     step = args.get("step", 5)
                     await self._send_payload_cmd(bytes([0x03, step]))
@@ -123,7 +130,6 @@ class BLEManager(QThread):
     async def _disconnect_nodes(self):
         self.log_sig.emit("Disconnessione dai nodi BLE in corso...")
         
-        # Stop di sicurezza a entrambi i nodi
         await self._send_base_cmd(bytes([0x00]))
         await self._send_payload_cmd(bytes([0x00]))
 
@@ -150,18 +156,15 @@ class BLEManager(QThread):
             theta_enc = (data[0] << 8) | data[1]
             motor_deg = theta_enc / 10.0
 
-            # Rileva completamento di 1 giro del motore
             if self.last_motor_deg > 300.0 and motor_deg < 60.0:
                 self.motor_rev_count += 1
             self.last_motor_deg = motor_deg
 
-            # Angolo cumulato e reale del piatto rotante
             total_motor_angle = (self.motor_rev_count * 360.0) + motor_deg
             plate_deg = (total_motor_angle / GEAR_RATIO) % 360.0
 
             self.azimuth_received_sig.emit(plate_deg)
 
-            # Trigger fine giro del piatto a 360°
             if self.prev_plate_deg > 320.0 and plate_deg < 40.0:
                 self.lap_completed_sig.emit(1)
             self.prev_plate_deg = plate_deg

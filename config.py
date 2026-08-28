@@ -1,15 +1,14 @@
 # --- PARAMETRI MECCANICI & RIDUZIONE ---
 GEAR_RATIO = 6.0        # 6 giri di stepper = 1 giro completo del piatto (360°)
+DEFAULT_STEPPER_RPM = 10  # Velocità standard di default dello stepper
 
 # --- CALIBRAZIONE GIMBAL TILT ---
 SERVO_BOTTOM_DEG = 165  # Punto di partenza servo (sotto l'orizzontale)
 SERVO_TOP_DEG = 70      # Punto di arrivo servo (sopra l'orizzontale)
 SERVO_HORIZON_DEG = 135 # Angolo servo in cui il laser è PERFETTAMENTE ORIZZONTALE (0°)
-TILT_STEP_DEG = 5      # Passo di test (rimetti a 5 per scansioni dense)
-# In config.py
+TILT_STEP_DEG = 5      # Passo di test
+
 SENSOR_HEIGHT_CM = 85.0  # Altezza del perno del sensore dal pavimento (in cm)
-# Fattore di scala angolare meccanico del servo (1.0 = 1 grado servo corrisponde a 1 grado fisico reale)
-# Se noti che a 70° non arriva a +65° ma meno/più, basta ritoccare questo moltiplicatore
 SERVO_DEG_SCALE = 1.0
 
 # --- BLE NODES CONFIGURATION ---
