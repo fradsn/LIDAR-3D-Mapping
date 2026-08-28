@@ -47,15 +47,18 @@ class BLEManager(QThread):
                     self.last_motor_deg = 0.0
                     self.prev_plate_deg = 0.0
                     
-                    # 1. Avvia il payload LiDAR
+                    # 1. Avvia prima il Payload LiDAR
                     await self._send_payload_cmd(bytes([0x01]))
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.15)
                     
-                    # 2. Avvia la base stepper alla velocità specificata
+                    # 2. Avvia la Base Stepper
                     await self._send_base_cmd(bytes([0x01, int(rpm)]))
                 elif cmd == "STOP_SCAN":
+                    # 1. Ferma prima la Base Stepper
                     await self._send_base_cmd(bytes([0x00]))
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(0.1)
+                    
+                    # 2. Ferma il Payload LiDAR
                     await self._send_payload_cmd(bytes([0x00]))
                 elif cmd == "SET_SPEED":
                     rpm = args.get("rpm", 10)
@@ -131,6 +134,7 @@ class BLEManager(QThread):
         self.log_sig.emit("Disconnessione dai nodi BLE in corso...")
         
         await self._send_base_cmd(bytes([0x00]))
+        await asyncio.sleep(0.05)
         await self._send_payload_cmd(bytes([0x00]))
 
         if self.client_base and self.client_base.is_connected:
@@ -178,14 +182,16 @@ class BLEManager(QThread):
     async def _send_base_cmd(self, payload: bytes):
         if self.client_base and self.client_base.is_connected:
             try:
-                await self.client_base.write_gatt_char(BASE_CTRL_CHAR_UUID, payload)
+                # response=False evita blocchi o attese ACK
+                await self.client_base.write_gatt_char(BASE_CTRL_CHAR_UUID, payload, response=False)
             except Exception as e:
                 self.log_sig.emit(f"Errore invio comando Base: {e}")
 
     async def _send_payload_cmd(self, payload: bytes):
         if self.client_payload and self.client_payload.is_connected:
             try:
-                await self.client_payload.write_gatt_char(PAYLOAD_CTRL_CHAR_UUID, payload)
+                # response=False evita blocchi o attese ACK
+                await self.client_payload.write_gatt_char(PAYLOAD_CTRL_CHAR_UUID, payload, response=False)
             except Exception as e:
                 self.log_sig.emit(f"Errore invio comando Payload: {e}")
 
