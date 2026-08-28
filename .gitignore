@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files (Cache Python)
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -26,28 +26,36 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Ambienti Virtuali (venv, conda)
+# Virtual Environments
 venv/
 .venv/
-env/
 ENV/
+env/
 env.bak/
 venv.bak/
 
-# IDE e Editor
+# IDE / Editor Settings
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# File di esportazione / Scansioni generate durante i test (opzionale)
-*.ply
-*.xyz
-*.json
-*.png
-
-# File temporanei di sistema
 .DS_Store
 Thumbs.db
-desktop.ini
+
+# Arduino / PlatformIO build artifacts
+.pio/
+.pioenvs/
+.piolibdeps/
+*.hex
+*.elf
+*.bin
+
+# Log & Output export files generati durante i test locali
+*.log
+*.ply
+*.xyz
+*.dxf
+output/
+scans/
+recordings/
