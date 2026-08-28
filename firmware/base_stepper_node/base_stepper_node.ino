@@ -10,7 +10,7 @@ const int IN3 = 14;
 const int IN4 = 26;
 
 // --- SPECIFICHE STEPPER (Half-Step 28BYJ-48) ---
-const int STEPS_PER_REV = 4096; // 4096 passi per un giro completo di 360°
+const int STEPS_PER_REV = 4096; // 4096 passi per un giro completo dell'alberino
 const int stepLookup[8] = {
   B01000,
   B01100,
@@ -25,32 +25,53 @@ const int stepLookup[8] = {
 // --- BLE UUIDs (Allineati a config.py) ---
 #define BASE_SERVICE_UUID      "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define BASE_AZIMUTH_CHAR_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define BASE_CONTROL_CHAR_UUID "beb5483f-36e1-4688-b7f5-ea07361b26a8"
 
 BLECharacteristic *pAzimuthCharacteristic;
 bool deviceConnected = false;
-bool rotating = false;
+bool rotating = false; // RIMANE FERMO FINCHÉ NON ARRIVA IL COMANDO START
 
 long currentStep = 0;
 int stepIndex = 0;
 unsigned long lastStepTime = 0;
-const unsigned long stepIntervalMicros = 2200; // ~9 secondi a giro completo
+const unsigned long stepIntervalMicros = 2200; // ~9 secondi a giro motore
+
+void disableCoils() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+}
 
 class BaseServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
-    rotating = true;
-    Serial.println("[BASE] Controller connesso, rotazione avviata");
+    rotating = false; // Non parte alla connessione, attende il comando dall'app
+    Serial.println("[BASE] Controller connesso, in attesa di 'Avvia Scansione'...");
   }
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
     rotating = false;
-    // Disattiva tutte le bobine per evitare riscaldamento del motore a riposo
-    digitalWrite(IN1, LOW);
-    digitalWrite(IN2, LOW);
-    digitalWrite(IN3, LOW);
-    digitalWrite(IN4, LOW);
-    Serial.println("[BASE] Controller disconnesso, motore fermato");
+    disableCoils();
+    Serial.println("[BASE] Controller disconnesso, motore fermato e bobine a riposo");
     pServer->startAdvertising();
+  }
+};
+
+class BaseControlCallbacks: public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *pCharacteristic) {
+    String rxValue = pCharacteristic->getValue();
+    if (rxValue.length() > 0) {
+      uint8_t cmd = rxValue[0];
+      if (cmd == 0x01) {
+        rotating = true;
+        Serial.println("[BASE CMD] Ricevuto START: avvio rotazione piatto!");
+      } else if (cmd == 0x00) {
+        rotating = false;
+        disableCoils();
+        Serial.println("[BASE CMD] Ricevuto STOP: arresto rotazione piatto!");
+      }
+    }
   }
 };
 
@@ -68,6 +89,7 @@ void setup() {
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
+  disableCoils();
 
   // Inizializzazione BLE
   BLEDevice::init("ESP32-Stepper-Base");
@@ -76,11 +98,19 @@ void setup() {
 
   BLEService *pService = pServer->createService(BASE_SERVICE_UUID);
 
+  // Caratteristica di Notifica Angolo Azimut (Read / Notify)
   pAzimuthCharacteristic = pService->createCharacteristic(
     BASE_AZIMUTH_CHAR_UUID,
     BLECharacteristic::PROPERTY_NOTIFY
   );
   pAzimuthCharacteristic->addDescriptor(new BLE2902());
+
+  // Caratteristica di Controllo Start/Stop (Write)
+  BLECharacteristic *pControlCharacteristic = pService->createCharacteristic(
+    BASE_CONTROL_CHAR_UUID,
+    BLECharacteristic::PROPERTY_WRITE
+  );
+  pControlCharacteristic->setCallbacks(new BaseControlCallbacks());
 
   pService->start();
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -88,7 +118,7 @@ void setup() {
   pAdvertising->setScanResponse(true);
   pAdvertising->start();
 
-  Serial.println("Base Stepper pronta (Pin D25, D27, D14, D26) in advertising...");
+  Serial.println("Base Stepper con controllo Start/Stop pronta in advertising...");
 }
 
 void loop() {
@@ -102,7 +132,7 @@ void loop() {
       setStepPins(stepLookup[stepIndex]);
       currentStep = (currentStep + 1) % STEPS_PER_REV;
 
-      // Invia pacchetto BLE ogni 16 step (~1.4° di risoluzione)
+      // Invia pacchetto BLE ogni 16 step (~1.4° di risoluzione alberino)
       if (currentStep % 16 == 0) {
         float thetaDeg = (float(currentStep) / STEPS_PER_REV) * 360.0f;
         uint16_t thetaEnc = (uint16_t)(thetaDeg * 10.0f); // 0.0° - 360.0° -> 0 - 3600
@@ -122,6 +152,6 @@ void loop() {
       }
     }
   } else {
-    delay(20);
+    delay(10);
   }
 }
