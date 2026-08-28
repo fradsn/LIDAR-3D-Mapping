@@ -1,8 +1,9 @@
 import time
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QGridLayout,
     QPushButton, QLabel, QGroupBox, QProgressBar, QTextEdit,
-    QFileDialog, QMessageBox, QComboBox, QSlider
+    QFileDialog, QMessageBox, QComboBox, QSlider, QScrollArea,
+    QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
@@ -22,7 +23,6 @@ class MainWindow(QMainWindow):
         self.sync_engine = SyncEngine()
         self.ble_manager = BLEManager()
         
-        # Risoluzione predefinita: Standard (5°)
         self.tilt_step_deg = 5
         self._recalculate_tilt_sequence()
 
@@ -30,7 +30,6 @@ class MainWindow(QMainWindow):
         self.payload_is_connected = False
         self.current_plate_azimuth = 0.0
         
-        # Variabili countdown
         self.scan_start_time = 0.0
         self.est_lap_duration = 54.0
 
@@ -54,14 +53,14 @@ class MainWindow(QMainWindow):
     def _create_menu_bar(self):
         menubar = self.menuBar()
 
-        # --- MENU FILE ---
+        # --- MENU FILE (ESPORTAZIONE E SALVATAGGI) ---
         file_menu = menubar.addMenu("&File")
 
         act_export_ply = QAction("Esporta come Mesh/Point Cloud (.ply)...", self)
         act_export_ply.triggered.connect(self._export_ply)
         file_menu.addAction(act_export_ply)
 
-        act_export_xyz = QAction("Esporta coordinate grezze (.xyz / .csv)...", self)
+        act_export_xyz = QAction("Esporta coordinate XYZ (.xyz / .csv)...", self)
         act_export_xyz.triggered.connect(self._export_xyz)
         file_menu.addAction(act_export_xyz)
 
@@ -81,7 +80,7 @@ class MainWindow(QMainWindow):
         act_screenshot.triggered.connect(self._capture_screenshot)
         file_menu.addAction(act_screenshot)
 
-        # --- MENU VISTA (PRESET TELECAMERA) ---
+        # --- MENU VISTA ---
         view_menu = menubar.addMenu("&Vista")
         
         act_iso = QAction("Vista Isometrica (3D)", self)
@@ -109,9 +108,15 @@ class MainWindow(QMainWindow):
         self.viewer = PointCloudView()
         main_layout.addWidget(self.viewer, stretch=3)
 
-        # 2. Pannello di Controllo (Destra)
-        panel_layout = QVBoxLayout()
-        main_layout.addLayout(panel_layout, stretch=1)
+        # 2. Pannello di Controllo con Scroll Area (Destra)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        panel_widget = QWidget()
+        panel_layout = QVBoxLayout(panel_widget)
+        scroll.setWidget(panel_widget)
+        main_layout.addWidget(scroll, stretch=1)
 
         # Gruppo Connessioni BLE
         conn_group = QGroupBox("Dispositivi BLE")
@@ -124,7 +129,7 @@ class MainWindow(QMainWindow):
         conn_box.addWidget(self.lbl_payload_status)
         panel_layout.addWidget(conn_group)
 
-        # Gruppo Opzioni di Scansione (PUNTO 5)
+        # Gruppo Parametri di Scansione
         config_group = QGroupBox("Parametri di Scansione")
         cfg_box = QVBoxLayout(config_group)
         
@@ -133,13 +138,22 @@ class MainWindow(QMainWindow):
         self.combo_res.addItem("⚡ Fast Test (Passo 15° ~4 min)", 15)
         self.combo_res.addItem("⚡ Standard (Passo 5° ~15 min)", 5)
         self.combo_res.addItem("🔬 Ultra High-Density (Passo 2° ~35 min)", 2)
-        self.combo_res.setCurrentIndex(1)  # Default: Standard 5°
+        self.combo_res.setCurrentIndex(1)
         self.combo_res.currentIndexChanged.connect(self._on_resolution_changed)
         cfg_box.addWidget(self.combo_res)
+
+        cfg_box.addWidget(QLabel("Altezza Sensore da Terra (cm):"))
+        self.spin_height = QDoubleSpinBox()
+        self.spin_height.setRange(0.0, 300.0)
+        self.spin_height.setValue(0.0)
+        self.spin_height.setSingleStep(1.0)
+        self.spin_height.setSuffix(" cm")
+        cfg_box.addWidget(self.spin_height)
+
         panel_layout.addWidget(config_group)
 
-        # Gruppo Rendering & Aspetto (PUNTO 2)
-        render_group = QGroupBox("Strumenti di Rendering")
+        # Gruppo Rendering & Telecamera
+        render_group = QGroupBox("Strumenti di Rendering & Vista")
         render_box = QVBoxLayout(render_group)
 
         render_box.addWidget(QLabel("Mappa Colori:"))
@@ -155,15 +169,21 @@ class MainWindow(QMainWindow):
         self.slider_pt_size.valueChanged.connect(self.viewer.set_point_size)
         render_box.addWidget(self.slider_pt_size)
 
-        # Preset Telecamera veloci nella GUI
-        cam_btn_layout = QHBoxLayout()
+        cam_grid = QGridLayout()
         btn_top = QPushButton("Top 2D")
         btn_top.clicked.connect(self.viewer.set_view_top)
         btn_iso = QPushButton("Iso 3D")
         btn_iso.clicked.connect(self.viewer.set_view_iso)
-        cam_btn_layout.addWidget(btn_top)
-        cam_btn_layout.addWidget(btn_iso)
-        render_box.addLayout(cam_btn_layout)
+        btn_front = QPushButton("Frontale")
+        btn_front.clicked.connect(self.viewer.set_view_front)
+        btn_side = QPushButton("Laterale")
+        btn_side.clicked.connect(self.viewer.set_view_side)
+        
+        cam_grid.addWidget(btn_top, 0, 0)
+        cam_grid.addWidget(btn_iso, 0, 1)
+        cam_grid.addWidget(btn_front, 1, 0)
+        cam_grid.addWidget(btn_side, 1, 1)
+        render_box.addLayout(cam_grid)
 
         panel_layout.addWidget(render_group)
 
@@ -180,7 +200,7 @@ class MainWindow(QMainWindow):
         tel_box.addWidget(self.lbl_pts_count)
         panel_layout.addWidget(telemetry_group)
 
-        # Gruppo Esecuzione Scansione 3D
+        # Gruppo Avanzamento Scansione
         scan_group = QGroupBox("Avanzamento Scansione")
         scan_box = QVBoxLayout(scan_group)
         self.btn_scan = QPushButton("Avvia Scansione 3D")
@@ -201,6 +221,7 @@ class MainWindow(QMainWindow):
         # Log Console
         self.log_console = QTextEdit()
         self.log_console.setReadOnly(True)
+        self.log_console.setMaximumHeight(120)
         panel_layout.addWidget(self.log_console)
 
     def _bind_signals(self):
@@ -217,7 +238,7 @@ class MainWindow(QMainWindow):
     def _on_resolution_changed(self, idx):
         self.tilt_step_deg = self.combo_res.currentData()
         self._recalculate_tilt_sequence()
-        self.log_console.append(f"Risoluzione aggiornata: Passo Tilt = {self.tilt_step_deg}° ({self.total_tilt_steps} livelli totali)")
+        self.log_console.append(f"Risoluzione aggiornata: Passo = {self.tilt_step_deg}° ({self.total_tilt_steps} livelli)")
 
     def _toggle_connection(self):
         if not (self.base_is_connected or self.payload_is_connected):
@@ -233,14 +254,14 @@ class MainWindow(QMainWindow):
         if self.btn_scan.text() == "Avvia Scansione 3D":
             self.sync_engine.clear()
             self.viewer.clear()
+            self.sync_engine.sensor_height_cm = self.spin_height.value()
             self.current_step_idx = 0
             self.current_plate_azimuth = 0.0
             self.progress_bar.setValue(0)
             self.progress_bar.setFormat("0% - Inizializzazione...")
             
-            # Blocca la modifica della risoluzione a scansione in corso
             self.combo_res.setEnabled(False)
-
+            self.spin_height.setEnabled(False)
             self.scan_start_time = time.time()
             self.lbl_time_info.setText("Tempo rimanente: Calcolo...")
             self.eta_timer.start()
@@ -252,6 +273,7 @@ class MainWindow(QMainWindow):
             self.ble_manager.send_command("STOP_SCAN")
             self.btn_scan.setText("Avvia Scansione 3D")
             self.combo_res.setEnabled(True)
+            self.spin_height.setEnabled(True)
             self.lbl_time_info.setText("Scansione interrotta.")
             self.progress_bar.setFormat("Scansione interrotta")
 
@@ -286,6 +308,7 @@ class MainWindow(QMainWindow):
         if not both_ready and self.btn_scan.text() == "Ferma Scansione":
             self.btn_scan.setText("Avvia Scansione 3D")
             self.combo_res.setEnabled(True)
+            self.spin_height.setEnabled(True)
 
     def _on_azimuth(self, theta_deg):
         self.current_plate_azimuth = theta_deg
@@ -344,7 +367,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setFormat(f"{perc}% - Rimangono: {time_str}")
         self.lbl_time_info.setText(f"Tempo rimanente: {mins} min {secs} sec")
 
-    # --- METODI ESPORTAZIONE FILE (PUNTO 1) ---
+    # --- METODI ESPORTAZIONE FILE ---
     def _export_ply(self):
         if not self.sync_engine.points_3d:
             QMessageBox.warning(self, "Attenzione", "Nessun punto 3D presente da esportare.")
@@ -377,6 +400,7 @@ class MainWindow(QMainWindow):
                 path += ".json"
             meta = {
                 "tilt_step": self.tilt_step_deg,
+                "sensor_height_cm": self.spin_height.value(),
                 "total_points": len(self.sync_engine.points_3d),
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
             }
@@ -391,6 +415,8 @@ class MainWindow(QMainWindow):
                 self.sync_engine.points_3d = [tuple(p) for p in pts]
                 self.viewer.update_cloud(self.sync_engine.points_3d)
                 self.lbl_pts_count.setText(f"Punti 3D Acquisiti: {len(pts)}")
+                if "sensor_height_cm" in meta:
+                    self.spin_height.setValue(meta["sensor_height_cm"])
                 self.log_console.append(f"Caricata sessione da {path} ({len(pts)} punti)")
                 QMessageBox.information(self, "Caricato", f"Caricati {len(pts)} punti 3D!")
 

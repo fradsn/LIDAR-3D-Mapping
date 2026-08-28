@@ -1,5 +1,5 @@
-import numpy as np
 import time
+import numpy as np
 from core.coordinates import spherical_to_cartesian
 
 class SyncEngine:
@@ -9,12 +9,13 @@ class SyncEngine:
         self.last_theta = 0.0
         self.total_revolutions = 0
         self.previous_angle = 0.0
+        self.sensor_height_cm = 0.0  # Quota impostata da interfaccia utente
 
     def add_azimuth(self, theta_deg: float):
         now = time.time()
         self.azimuth_buffer.append((now, theta_deg))
         
-        # Mantieni uno storico temporale di 2 secondi
+        # Mantiene uno storico temporale di ~200 campioni
         if len(self.azimuth_buffer) > 200:
             self.azimuth_buffer.pop(0)
 
@@ -32,10 +33,16 @@ class SyncEngine:
         times = [t for t, _ in self.azimuth_buffer]
         angles = [a for _, a in self.azimuth_buffer]
 
-        # Estrapola o interpola l'azimut al momento dell'arrivo del pacchetto LiDAR
+        # Interpola l'azimut all'esatto timestamp d'arrivo del frame LiDAR
         theta_interp = float(np.interp(now, times, angles))
         
-        pt = spherical_to_cartesian(distance_cm, theta_interp, servo_angle)
+        pt = spherical_to_cartesian(
+            distance_cm=distance_cm, 
+            azimuth_deg=theta_interp, 
+            servo_angle=servo_angle, 
+            sensor_h_cm=self.sensor_height_cm
+        )
+        
         if pt:
             self.points_3d.append(pt)
         return pt
