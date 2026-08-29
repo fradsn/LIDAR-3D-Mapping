@@ -18,25 +18,25 @@ A modular, cable-free 3D point cloud LiDAR scanning system combining a **TF-Luna
 
 ### 🖥️ Desktop GUI (Real-Time 3D Point Cloud View)
 <p align="center">
-  <img src="docs/images/gui_preview.png" width="95%" alt="3D LiDAR Scanner GUI Preview"/>
+  <img src="docs/images/Screenshot%202026-08-28%20165730.png" width="95%" alt="3D LiDAR Scanner GUI Preview"/>
 </p>
 
-### 🎬 Scanning In Action
+### 🎬 Real-Time 3D Rendering & Orbit Demo
 <p align="center">
-  <video src="docs/videos/demo.mp4" width="90%" controls></video>
+  <video src="https://github.com/user-attachments/assets/b5cd5d8e-1f79-47fe-916d-0ed75f87004f" width="90%" controls></video>
 </p>
 
 ---
 
 ## 🛠️ Physical Hardware Architecture
 
-| Front View | Top View | Side Angle |
+| Complete Base & Gimbal Assembly | Stepper Rotary Base (Enclosed) | Internal Drive & Controller Board |
 | :---: | :---: | :---: |
-| <img src="docs/images/hardware_front.png" width="100%" alt="Front View"/> | <img src="docs/images/hardware_top.png" width="100%" alt="Top View"/> | <img src="docs/images/hardware_side1.png" width="100%" alt="Side Angle"/> |
+| <img src="docs/images/IMG_20260828_221050443.jpg" width="100%" alt="Assembly Setup"/> | <img src="docs/images/IMG_20260828_220832221.jpg" width="100%" alt="Rotary Base"/> | <img src="docs/images/IMG_20260828_220851512.jpg" width="100%" alt="Internal Base PCB"/> |
 
-| Elevation Detail | Base & Gimbal Assembly |
+| Pitch Gimbal & Sensor Rig | Gimbal Elevation Mechanism |
 | :---: | :---: |
-| <img src="docs/images/hardware_side2.png" width="100%" alt="Elevation Detail"/> | <img src="docs/images/hardware_detail.png" width="100%" alt="Assembly Detail"/> |
+| <img src="docs/images/IMG_20260828_220927330.jpg" width="100%" alt="Gimbal Stage"/> | <img src="docs/images/IMG_20260828_220937666.jpg" width="100%" alt="Servo Mechanism"/> |
 
 ---
 
