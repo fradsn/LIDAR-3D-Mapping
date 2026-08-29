@@ -13,18 +13,30 @@ A modular, cable-free 3D point cloud LiDAR scanning system combining a **TF-Luna
 > **Universal Hardware & Firmware Ecosystem:** Shares identical physical hardware and unified ESP32 firmware with **LiDAR Studio 2D**. Operates in multi-layer volumetric 3D mode by synchronizing automatic gimbal pitch stepping with continuous 360° azimuth sweeps and real-time RPM modulation.
 
 ---
-<img width="1887" height="955" alt="Screenshot 2026-08-28 165730" src="https://github.com/user-attachments/assets/1dbd738b-b4a4-406a-9b78-87b1882f1b8c" />
 
+## 📸 System Overview & Demonstration
 
+### 🖥️ Desktop GUI (Real-Time 3D Point Cloud View)
+<p align="center">
+  <img src="docs/images/gui_preview.png" width="95%" alt="3D LiDAR Scanner GUI Preview"/>
+</p>
 
-https://github.com/user-attachments/assets/b5cd5d8e-1f79-47fe-916d-0ed75f87004f
+### 🎬 Scanning In Action
+<p align="center">
+  <video src="docs/videos/demo.mp4" width="90%" controls></video>
+</p>
 
+---
 
-<img width="3072" height="4080" alt="IMG_20260828_221050443" src="https://github.com/user-attachments/assets/1349931b-543d-4787-8400-41d0fc21802f" />
-<img width="4080" height="3072" alt="IMG_20260828_220937666" src="https://github.com/user-attachments/assets/c5e71bda-3a38-4afc-a161-ee8b38a6e257" />
-<img width="3072" height="4080" alt="IMG_20260828_220927330" src="https://github.com/user-attachments/assets/85ef5748-99c4-46d2-957a-a3cad97c2390" />
-<img width="3072" height="4080" alt="IMG_20260828_220851512" src="https://github.com/user-attachments/assets/22740df5-2c95-4f88-972a-d434d5425d34" />
-<img width="3072" height="4080" alt="IMG_20260828_220832221" src="https://github.com/user-attachments/assets/a2090365-aa69-4d81-8ad8-be29479bedc5" />
+## 🛠️ Physical Hardware Architecture
+
+| Front View | Top View | Side Angle |
+| :---: | :---: | :---: |
+| <img src="docs/images/hardware_front.png" width="100%" alt="Front View"/> | <img src="docs/images/hardware_top.png" width="100%" alt="Top View"/> | <img src="docs/images/hardware_side1.png" width="100%" alt="Side Angle"/> |
+
+| Elevation Detail | Base & Gimbal Assembly |
+| :---: | :---: |
+| <img src="docs/images/hardware_side2.png" width="100%" alt="Elevation Detail"/> | <img src="docs/images/hardware_detail.png" width="100%" alt="Assembly Detail"/> |
 
 ---
 
@@ -34,7 +46,7 @@ The system physically and logically decouples the rotating base from the moving 
 
 ```text
 ┌──────────────────────────────┐                 ┌──────────────────────────────┐
-│       BASE ESP32 NODE        │                 │      PAYLOAD ESP32 NODE      │
+│        BASE ESP32 NODE       │                 │      PAYLOAD ESP32 NODE      │
 │     (Fixed Base / Rotor)     │                 │    (Onboard Moving Stage)    │
 ├──────────────────────────────┤                 ├──────────────────────────────┤
 │ • 28BYJ-48 Stepper + ULN2003 │                 │ • TF-Luna LiDAR (UART / ToF) │
