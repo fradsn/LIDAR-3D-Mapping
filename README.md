@@ -25,7 +25,12 @@ A modular, cable-free 3D point cloud LiDAR scanning system combining a **TF-Luna
 <p align="center">
   <video src="https://github.com/user-attachments/assets/b5cd5d8e-1f79-47fe-916d-0ed75f87004f" width="90%" controls></video>
 </p>
+<p align="center">
+<video src="https://github.com/user-attachments/assets/3b43aa5f-e7e2-49e1-83c9-c72438903845" width="90%" controls></video>
 
+
+
+</p>
 ---
 
 ## 🛠️ Physical Hardware Architecture
